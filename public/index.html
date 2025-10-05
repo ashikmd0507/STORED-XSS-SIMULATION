@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Stored XSS Simulation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* Fixed full-viewport, centered, no scroll */
+    html,body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: linear-gradient(135deg,#0f172a,#0ea5e9 40%,#8b5cf6 80%); }
+    .wrap { height:100%; display:flex; align-items:center; justify-content:center; }
+    .card {
+      width: 520px; max-width: 94%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.86));
+      border-radius: 14px; padding: 28px; box-shadow: 0 10px 30px rgba(2,6,23,0.4);
+      text-align:center; transform: translateY(-10px);
+    }
+    h1 { margin: 0 0 6px 0; color:#0b1220; font-size:20px; }
+    p { margin:0 0 18px 0; color:#1f2937; font-size:13px; }
+    .uploader {
+      display:flex; gap:10px; align-items:center; justify-content:center; margin-bottom:18px;
+    }
+    .file-input {
+      padding:10px 16px; border-radius:10px; background:#eef2ff; border:1px dashed #c7d2fe; cursor:pointer;
+    }
+    input[type=file] { display:none; }
+    button.upload-btn {
+      background: linear-gradient(90deg,#06b6d4,#7c3aed);
+      border: none; color:white; padding:10px 18px; border-radius:10px; font-weight:600; cursor:pointer;
+      box-shadow: 0 6px 18px rgba(124,58,237,0.28);
+    }
+    .result { margin-top:14px; font-size:13px; color:#0f172a; text-align:left; word-break:break-all; }
+    .status { padding:10px; border-radius:8px; background:#f8fafc; border:1px solid #e6f0ff; }
+    .public-link { color:#0ea5e9; font-weight:600; text-decoration:none; }
+    small.note { display:block; margin-top:8px; color:#475569; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="main" aria-labelledby="title">
+      <h1 id="title">Stored XSS Simulation</h1>
+      <p>Upload image files (jpg, jpeg, png, heic).</p>
+      <p>Please note that: svg files are blocked by the server</p>
+      <div class="uploader">
+        <label class="file-input" id="fileLabel">
+          <span id="fileLabelText">Choose file</span>
+          <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.heic,image/*" />
+        </label>
+        <button class="upload-btn" id="uploadBtn">Upload</button>
+      </div>
+
+      <div class="result status" id="result">
+        <em>No uploads yet</em>
+      </div>
+      <small class="note">This demo intentionally contains an insecure JSON/data-url upload path for research.</small>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const fileLabelText = document.getElementById('fileLabelText');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const result = document.getElementById('result');
+
+    fileInput.addEventListener('change', () => {
+      if (!fileInput.files || !fileInput.files[0]) {
+        fileLabelText.innerText = 'Choose file';
+      } else {
+        fileLabelText.innerText = fileInput.files[0].name;
+      }
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      if (!fileInput.files || !fileInput.files[0]) {
+        result.innerHTML = '<strong style="color:#b91c1c">No file chosen</strong>';
+        return;
+      }
+
+      const f = fileInput.files[0];
+      // Use multipart/form-data (normal browser path)
+      const fd = new FormData();
+      fd.append('file', f, f.name);
+
+      result.innerHTML = 'Uploading...';
+
+      try {
+        const r = await fetch('/api/upload', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (j && j.success) {
+          result.innerHTML = `<div><strong>Success</strong><div style="margin-top:8px">Public URL: <a class="public-link" href="${j.publicUrl}" target="_blank">${j.publicUrl}</a></div><div style="margin-top:8px">Saved path (server): <code>${j.path}</code></div></div>`;
+        } else {
+          result.innerHTML = `<strong style="color:#b91c1c">Upload failed</strong><div style="margin-top:8px">${j && j.error ? j.error : 'Unknown error'}</div>`;
+        }
+      } catch (err) {
+        result.innerHTML = `<strong style="color:#b91c1c">Upload error</strong><div style="margin-top:8px">${err.message}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
